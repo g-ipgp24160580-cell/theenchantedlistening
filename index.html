@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Enchanted Listening Kingdom - 3D English Adventure</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js (3D Engine) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            overflow: hidden;
+            background-color: #1a102f;
+            width: 100vw;
+            height: 100vh;
+        }
+        h1, h2, h3, .font-heading {
+            font-family: 'Fredoka One', cursive;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            touch-action: none;
+        }
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .pointer-events-auto {
+            pointer-events: auto;
+        }
+        /* Touch Controls for iPad & Mobile */
+        #joystick-zone {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 140px;
+            height: 140px;
+            background: rgba(255, 255, 255, 0.25);
+            border: 3px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+            z-index: 20;
+        }
+        #joystick-knob {
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, #ff9ff3, #feca57);
+            border-radius: 50%;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.4);
+            pointer-events: none;
+            transition: transform 0.05s ease-out;
+        }
+        /* Pulse Animation */
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(255, 230, 0, 0.8)); }
+            50% { transform: scale(1.08); filter: drop-shadow(0 0 18px rgba(255, 230, 0, 1)); }
+        }
+        .glow-pulse {
+            animation: pulse-glow 2s infinite ease-in-out;
+        }
+        /* Custom Scrollbar for Modals */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ff9ff3;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="text-white">
+
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay Layer -->
+    <div class="ui-layer flex flex-col justify-between p-4 md:p-6">
+
+        <!-- Top Header Navigation & Stats -->
+        <div id="game-header" class="hidden flex justify-between items-center pointer-events-auto">
+            <!-- Left Info Panel -->
+            <div class="bg-indigo-950/80 backdrop-blur-md border-2 border-purple-400/50 rounded-2xl p-2 md:p-3 px-3 md:px-5 flex items-center space-x-3 md:space-x-4 shadow-xl">
+                <div class="flex items-center space-x-2">
+                    <span class="text-2xl md:text-3xl">💎</span>
+                    <div>
+                        <div class="text-[10px] md:text-xs uppercase font-bold text-purple-300">Gems</div>
+                        <div id="gem-counter" class="text-lg md:text-2xl font-heading text-yellow-300">0 Gems</div>
+                    </div>
+                </div>
+                <div class="h-8 w-px bg-purple-500/30"></div>
+                <div>
+                    <div id="level-title-display" class="text-[10px] md:text-xs uppercase font-bold text-purple-300">Level 1</div>
+                    <div id="task-progress" class="text-xs md:text-sm font-bold text-emerald-300">Task 1 of 8</div>
+                </div>
+            </div>
+
+            <!-- Center Audio Control Bar -->
+            <div id="audio-prompt-card" class="bg-indigo-900/90 border-2 border-yellow-400 rounded-2xl p-2 md:p-3 px-3 md:px-6 shadow-2xl flex items-center space-x-3 max-w-sm md:max-w-md w-full mx-2">
+                <button id="btn-replay-audio" onclick="window.game && window.game.replayAudioInstruction()" class="bg-yellow-400 hover:bg-yellow-300 active:scale-95 text-indigo-950 font-bold p-2 md:p-3 rounded-xl shadow-lg transition transform">
+                    <i class="fa-solid fa-volume-high text-xl md:text-2xl"></i>
+                </button>
+                <div class="flex-1 overflow-hidden">
+                    <div class="text-[10px] md:text-xs font-bold uppercase text-yellow-300 tracking-wider">Listen & Find</div>
+                    <div id="subtitle-text" class="text-xs md:text-base font-semibold leading-tight text-white drop-shadow truncate">"Listen closely..."</div>
+                </div>
+            </div>
+
+            <!-- Right Options Menu -->
+            <div class="flex space-x-2">
+                <button onclick="window.game && window.game.resetCameraAngle()" class="bg-purple-900/80 hover:bg-purple-800 border border-purple-400/50 rounded-xl p-2 md:p-3 text-lg md:text-xl transition" title="Reset Camera Angle">
+                    <i class="fa-solid fa-eye text-yellow-300"></i>
+                </button>
+                <button onclick="window.game && window.game.toggleAudioMute()" class="bg-purple-900/80 hover:bg-purple-800 border border-purple-400/50 rounded-xl p-2 md:p-3 text-lg md:text-xl transition">
+                    <i id="audio-icon" class="fa-solid fa-volume-high text-yellow-300"></i>
+                </button>
+                <button onclick="window.game && window.game.showSheetsConfigModal()" class="bg-purple-900/80 hover:bg-purple-800 border border-purple-400/50 rounded-xl p-2 md:p-3 text-lg md:text-xl transition" title="Google Sheets Setup">
+                    <i class="fa-solid fa-file-excel text-emerald-400"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Interactive HUD / Target Prompt -->
+        <div id="interaction-hud" class="hidden text-center my-auto pointer-events-auto">
+            <div id="interact-prompt" class="inline-block bg-yellow-400 text-indigo-950 font-heading text-base md:text-xl px-5 md:px-6 py-2 rounded-full shadow-2xl border-2 border-white glow-pulse cursor-pointer" onclick="window.game && window.game.onInteractButtonPressed()">
+                Tap to Select ✨
+            </div>
+        </div>
+
+        <!-- Bottom Controls & iPad Actions -->
+        <div id="game-footer" class="hidden flex justify-between items-end pointer-events-auto w-full">
+            <!-- Controls Legend (Desktop) -->
+            <div class="hidden lg:flex bg-indigo-950/70 border border-purple-500/40 rounded-xl p-3 space-x-4 text-xs font-medium text-purple-200">
+                <div><span class="bg-purple-800 px-2 py-1 rounded font-bold text-white">WASD / Touch</span> Move</div>
+                <div><span class="bg-purple-800 px-2 py-1 rounded font-bold text-white">Drag Mouse / Touch</span> Rotate View</div>
+                <div><span class="bg-purple-800 px-2 py-1 rounded font-bold text-white">SPACE</span> Jump</div>
+                <div><span class="bg-purple-800 px-2 py-1 rounded font-bold text-white">E / Tap 3D</span> Select</div>
+                <div><span class="bg-purple-800 px-2 py-1 rounded font-bold text-white">R</span> Replay Audio</div>
+            </div>
+
+            <!-- Mobile & iPad Touch Action Buttons -->
+            <div class="flex space-x-4 ml-auto z-30">
+                <button id="btn-touch-interact" onclick="window.game && window.game.onInteractButtonPressed()" class="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-tr from-yellow-400 to-amber-500 text-indigo-950 rounded-full font-heading text-2xl md:text-3xl shadow-2xl border-4 border-white active:scale-95 flex items-center justify-center">
+                    ✨
+                </button>
+                <button id="btn-touch-jump" onclick="window.game && window.game.triggerPlayerJump()" class="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-tr from-purple-500 to-pink-500 text-white rounded-full font-heading text-sm md:text-base shadow-2xl border-4 border-white active:scale-95 flex items-center justify-center">
+                    JUMP 🚀
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Touch Joystick Overlay (Mobile & iPad) -->
+    <div id="joystick-zone" class="pointer-events-auto">
+        <div id="joystick-knob"></div>
+    </div>
+
+    <!-- MODALS LAYER -->
+
+    <!-- Modal 1: Welcome & Student Profile Registration -->
+    <div id="modal-welcome" class="fixed inset-0 bg-indigo-950/90 backdrop-blur-lg flex items-center justify-center z-50 p-4 pointer-events-auto">
+        <div class="bg-gradient-to-b from-purple-900 to-indigo-900 border-4 border-yellow-400/80 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl text-center relative overflow-hidden">
+            <div class="text-6xl mb-2 animate-bounce">🏰</div>
+            <h1 class="text-3xl md:text-4xl text-yellow-300 font-heading mb-2 drop-shadow-md">Enchanted Kingdom</h1>
+            <p class="text-purple-200 text-sm mb-6">Year 3 English Listening 3D Adventure</p>
+
+            <form id="form-login" onsubmit="window.game && window.game.startAdventure(event)" class="space-y-4 text-left">
+                <div>
+                    <label class="block text-xs uppercase font-bold text-purple-300 mb-1">Student Name</label>
+                    <input type="text" id="input-student-name" required placeholder="e.g. Adam Rayyan" class="w-full bg-indigo-950/80 border-2 border-purple-400/50 rounded-xl px-4 py-2 text-white placeholder-purple-400 focus:outline-none focus:border-yellow-400">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs uppercase font-bold text-purple-300 mb-1">Student ID / No</label>
+                        <input type="text" id="input-student-id" required placeholder="e.g. S1029" class="w-full bg-indigo-950/80 border-2 border-purple-400/50 rounded-xl px-4 py-2 text-white placeholder-purple-400 focus:outline-none focus:border-yellow-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase font-bold text-purple-300 mb-1">Class</label>
+                        <input type="text" id="input-student-class" required placeholder="e.g. 3 Cemerlang" class="w-full bg-indigo-950/80 border-2 border-purple-400/50 rounded-xl px-4 py-2 text-white placeholder-purple-400 focus:outline-none focus:border-yellow-400">
+                    </div>
+                </div>
+
+                <div class="pt-4">
+                    <button type="submit" class="w-full bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-indigo-950 font-heading text-xl py-3 rounded-2xl shadow-xl transform transition hover:scale-105 active:scale-95">
+                        BEGIN ADVENTURE 🚀
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Google Sheets Setup Config Modal -->
+    <div id="modal-sheets" class="hidden fixed inset-0 bg-indigo-950/90 backdrop-blur-md flex items-center justify-center z-50 p-4 pointer-events-auto">
+        <div class="bg-purple-900 border-2 border-purple-400 rounded-3xl p-6 max-w-lg w-full shadow-2xl text-left">
+            <h2 class="text-2xl font-heading text-yellow-300 mb-2">📊 Google Sheets Integration Setup</h2>
+            <p class="text-xs text-purple-200 mb-4 leading-relaxed">
+                Connect pupil assessment performance directly to your Google Sheet using Google Apps Script Web App URL.
+            </p>
+            
+            <div class="space-y-3 mb-4">
+                <label class="block text-xs uppercase font-bold text-purple-300">Google Apps Script Web App URL:</label>
+                <input type="url" id="input-script-url" placeholder="https://script.google.com/macros/s/.../exec" class="w-full bg-indigo-950 border border-purple-400/50 rounded-xl px-3 py-2 text-xs text-white placeholder-purple-400 focus:outline-none focus:border-yellow-400">
+                
+                <div class="bg-indigo-950 p-3 rounded-xl text-xs text-purple-300 space-y-1">
+                    <div class="font-bold text-yellow-300">Quick Apps Script Deployment Code:</div>
+                    <textarea readonly class="w-full bg-black/40 text-emerald-400 font-mono text-[10px] p-2 rounded h-24 select-all">
+function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(data.sheetName || "Level Results") || ss.insertSheet(data.sheetName || "Level Results");
+  if (sheet.getLastRow() == 0) {
+    sheet.appendRow(["Timestamp", "Student ID", "Name", "Class", "Attempt ID", "Level", "Skill", "Total Qs", "Correct", "Incorrect", "Score %", "Attempts", "Time (s)", "Status"]);
+  }
+  sheet.appendRow([new Date(), data.studentId, data.studentName, data.studentClass, data.attemptId, data.levelName, data.skill, data.totalQuestions, data.correct, data.incorrect, data.scorePercentage, data.attempts, data.timeTaken, data.status]);
+  return ContentService.createTextOutput(JSON.stringify({"result":"success"})).setMimeType(ContentService.MimeType.JSON);
+}</textarea>
+                </div>
+            </div>
+
+            <div class="flex space-x-3">
+                <button onclick="window.game && window.game.saveSheetsConfig()" class="flex-1 bg-emerald-500 hover:bg-emerald-400 text-indigo-950 font-bold py-2 rounded-xl text-sm">Save Webhook</button>
+                <button onclick="window.game && window.game.closeSheetsConfigModal()" class="bg-purple-800 hover:bg-purple-700 text-purple-200 px-4 py-2 rounded-xl text-sm">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 3: Level Victory / Transition Dialog -->
+    <div id="modal-level-complete" class="hidden fixed inset-0 bg-indigo-950/90 backdrop-blur-md flex items-center justify-center z-50 p-4 pointer-events-auto">
+        <div class="bg-gradient-to-b from-purple-900 to-indigo-950 border-4 border-yellow-400 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl text-center">
+            <div class="text-6xl mb-2 animate-bounce">🌟</div>
+            <h2 id="complete-level-title" class="text-3xl font-heading text-yellow-300 mb-1">Level Complete!</h2>
+            <p id="complete-level-subtitle" class="text-sm text-purple-200 mb-4">You restored the Forest Listening Crystal!</p>
+
+            <div class="bg-indigo-950/80 rounded-2xl p-4 mb-6 grid grid-cols-2 gap-3 text-left border border-purple-500/30">
+                <div>
+                    <div class="text-xs text-purple-300 uppercase font-bold">Score</div>
+                    <div id="complete-score" class="text-xl font-heading text-emerald-400">100%</div>
+                </div>
+                <div>
+                    <div class="text-xs text-purple-300 uppercase font-bold">Accuracy</div>
+                    <div id="complete-accuracy" class="text-xl font-heading text-yellow-300">8 / 8</div>
+                </div>
+                <div>
+                    <div class="text-xs text-purple-300 uppercase font-bold">Time Taken</div>
+                    <div id="complete-time" class="text-sm font-bold text-purple-200">45s</div>
+                </div>
+                <div>
+                    <div class="text-xs text-purple-300 uppercase font-bold">Data Saved</div>
+                    <div id="complete-sheet-status" class="text-xs font-semibold text-emerald-400">Synced to Sheet ✓</div>
+                </div>
+            </div>
+
+            <button id="btn-next-level" onclick="window.game && window.game.loadNextLevel()" class="w-full bg-yellow-400 hover:bg-yellow-300 text-indigo-950 font-heading text-lg py-3 rounded-2xl shadow-xl transition transform hover:scale-105">
+                CONTINUE TO NEXT LEVEL ➔
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal 4: Grand Victory & Final Assessment Report Card -->
+    <div id="modal-final-report" class="hidden fixed inset-0 bg-indigo-950/95 backdrop-blur-xl flex items-center justify-center z-50 p-4 overflow-y-auto pointer-events-auto">
+        <div class="bg-gradient-to-b from-purple-900 via-indigo-900 to-slate-950 border-4 border-yellow-400 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl text-center my-8">
+            <div class="text-7xl mb-2 animate-pulse">👑</div>
+            <h1 class="text-3xl md:text-5xl font-heading text-yellow-300 mb-2">KINGDOM RESTORED!</h1>
+            <p class="text-purple-200 text-base mb-6">Master English Listening Explorer Certificate</p>
+
+            <!-- Pupil Information Card -->
+            <div class="bg-indigo-950/90 border border-purple-400/40 rounded-2xl p-4 mb-6 flex justify-between text-left">
+                <div>
+                    <div class="text-xs text-purple-300 uppercase font-bold">Student Name</div>
+                    <div id="report-name" class="text-lg font-heading text-white">Adam Rayyan</div>
+                </div>
+                <div>
+                    <div class="text-xs text-purple-300 uppercase font-bold">Student ID</div>
+                    <div id="report-id" class="text-sm font-bold text-yellow-300">S1029</div>
+                </div>
+                <div>
+                    <div class="text-xs text-purple-300 uppercase font-bold">Class</div>
+                    <div id="report-class" class="text-sm font-bold text-purple-200">3 Cemerlang</div>
+                </div>
+            </div>
+
+            <!-- Breakdown Table -->
+            <div class="bg-indigo-950/70 rounded-2xl p-4 mb-6 border border-purple-500/30 overflow-hidden">
+                <table class="w-full text-left text-xs md:text-sm">
+                    <thead>
+                        <tr class="border-b border-purple-500/30 text-purple-300 uppercase font-bold">
+                            <th class="pb-2">Level</th>
+                            <th class="pb-2">Skill Evaluated</th>
+                            <th class="pb-2 text-center">Correct</th>
+                            <th class="pb-2 text-right">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="report-table-body" class="divide-y divide-purple-500/20 text-purple-100">
+                        <!-- Dynamic Rows Here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Overall Total Score Banner -->
+            <div class="bg-gradient-to-r from-yellow-500 to-amber-500 text-indigo-950 rounded-2xl p-4 mb-6 flex justify-between items-center shadow-lg">
+                <div class="text-left">
+                    <div class="text-xs font-bold uppercase tracking-wider">Overall Kingdom Listening Score</div>
+                    <div class="text-2xl font-heading">EXCELLENT LISTENER</div>
+                </div>
+                <div id="report-overall-percentage" class="text-4xl font-heading">100%</div>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-3">
+                <button onclick="window.print()" class="flex-1 bg-purple-800 hover:bg-purple-700 text-purple-200 font-bold py-3 rounded-2xl text-sm transition">
+                    <i class="fa-solid fa-print mr-2"></i> Print Score Report
+                </button>
+                <button onclick="location.reload()" class="flex-1 bg-yellow-400 hover:bg-yellow-300 text-indigo-950 font-heading py-3 rounded-2xl text-base shadow-xl transition">
+                    PLAY AGAIN 🔄
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN GAME LOGIC ENGINE CODE -->
+    <script>
+        /**
+         * THE ENCHANTED LISTENING KINGDOM
+         * Full 3D WebGL Listening Game Built with Three.js (Optimized for iPad & Mobile Touch)
+         */
+
+        class EnchantedKingdomGame {
+            constructor() {
+                // Game States
+                this.currentLevelIndex = 0;
+                this.isGameActive = false;
+                this.audioMuted = false;
+                
+                // Student Information
+                this.studentProfile = {
+                    name: "",
+                    id: "",
+                    class: "",
+                    attemptId: "ATT_" + Math.floor(Math.random() * 899999 + 100000)
+                };
+
+                // Google Sheets Webhook Configuration
+                this.sheetsWebhookUrl = localStorage.getItem('kingdom_sheets_url') || '';
+
+                // Stats & Results Tracking
+                this.levelResults = [];
+                this.currentTaskIndex = 0;
+                this.currentLevelAttempts = 0;
+                this.currentLevelCorrect = 0;
+                this.currentLevelStartTime = 0;
+                this.scoreGems = 0;
+
+                // Level Questions Configuration
+                this.levelsConfig = [
+                    {
+                        name: "The Whispering Forest",
+                        skill: "Vocabulary Identification",
+                        description: "Listen to the word and walk to or tap the correct animated creature or prop.",
+                        tasks: [
+                            { audio: "Find the butterfly!", target: "butterfly", text: "Butterfly" },
+                            { audio: "Walk to the red apple!", target: "apple_red", text: "Red Apple" },
+                            { audio: "Where is the fluffy rabbit?", target: "rabbit_npc", text: "Rabbit" },
+                            { audio: "Find the yellow mushroom!", target: "mushroom_yellow", text: "Yellow Mushroom" },
+                            { audio: "Walk to the blue flower!", target: "flower_blue", text: "Blue Flower" },
+                            { audio: "Find the magical crystal!", target: "crystal_forest", text: "Magic Crystal" },
+                            { audio: "Where is the owl?", target: "owl", text: "Owl" },
+                            { audio: "Find the pink blossom tree!", target: "tree_pink", text: "Pink Blossom Tree" }
+                        ]
+                    },
+                    {
+                        name: "The Fairy's Secret Garden",
+                        skill: "Following Spoken Instructions & Prepositions",
+                        description: "Listen to prepositions and instructions to activate objects in the garden.",
+                        tasks: [
+                            { audio: "Pick up the blue crystal under the rainbow bridge.", target: "crystal_bridge", text: "Crystal under bridge" },
+                            { audio: "Touch the red flower next to the river fountain.", target: "flower_fountain", text: "Flower near fountain" },
+                            { audio: "Find the golden key on top of the mushroom.", target: "key_mushroom", text: "Key on mushroom" },
+                            { audio: "Touch the basket beside the fairy statue.", target: "basket_fairy", text: "Basket beside statue" },
+                            { audio: "Find the yellow star behind the pink tree.", target: "star_tree", text: "Star behind tree" },
+                            { audio: "Touch the green potion near the gate.", target: "potion_gate", text: "Potion near gate" },
+                            { audio: "Find the purple bell under the giant leaf.", target: "bell_leaf", text: "Bell under leaf" },
+                            { audio: "Touch the glowing orb inside the stone ring.", target: "orb_ring", text: "Orb in stone ring" }
+                        ]
+                    },
+                    {
+                        name: "The Baby Dragon's Castle",
+                        skill: "Listening Comprehension & Short Stories",
+                        description: "Listen to the dragon's short story and step into or tap the correct answer portal.",
+                        tasks: [
+                            { 
+                                audio: "Tom has a little brown dog named Max. Max loves playing with a yellow ball. What does Max love playing with?",
+                                target: "portal_ball",
+                                options: [
+                                    { text: "Yellow Ball", target: "portal_ball", correct: true },
+                                    { text: "Red Bone", target: "portal_bone", correct: false },
+                                    { text: "Blue Stick", target: "portal_stick", correct: false }
+                                ]
+                            },
+                            { 
+                                audio: "Maya goes to the bakery every morning. She buys two sweet cupcakes and a bottle of milk. What does Maya buy to eat?",
+                                target: "portal_cupcake",
+                                options: [
+                                    { text: "Fresh Bread", target: "portal_bread", correct: false },
+                                    { text: "Sweet Cupcakes", target: "portal_cupcake", correct: true },
+                                    { text: "Crispy Apples", target: "portal_apple", correct: false }
+                                ]
+                            },
+                            { 
+                                audio: "It is raining outside today. Dan wears his bright yellow raincoat and green boots. What color is Dan's raincoat?",
+                                target: "portal_yellow",
+                                options: [
+                                    { text: "Bright Yellow", target: "portal_yellow", correct: true },
+                                    { text: "Deep Blue", target: "portal_blue", correct: false },
+                                    { text: "Bright Red", target: "portal_red", correct: false }
+                                ]
+                            },
+                            { 
+                                audio: "Lily's cat, Whiskers, sleeps under the big wooden table when it is noisy. Where does Whiskers sleep?",
+                                target: "portal_table",
+                                options: [
+                                    { text: "On the Sofa", target: "portal_sofa", correct: false },
+                                    { text: "Under the Table", target: "portal_table", correct: true },
+                                    { text: "Inside the Box", target: "portal_box", correct: false }
+                                ]
+                            },
+                            { 
+                                audio: "Ben has three balloons. The blue balloon flies high into the sky. How many balloons does Ben have in total?",
+                                target: "portal_three",
+                                options: [
+                                    { text: "Two Balloons", target: "portal_two", correct: false },
+                                    { text: "Three Balloons", target: "portal_three", correct: true },
+                                    { text: "Five Balloons", target: "portal_five", correct: false }
+                                ]
+                            },
+                            { 
+                                audio: "Sarah loves drawing pictures of purple butterflies with her colorful crayons. What does Sarah draw?",
+                                target: "portal_butterfly",
+                                options: [
+                                    { text: "Purple Butterflies", target: "portal_butterfly", correct: true },
+                                    { text: "Green Frogs", target: "portal_frog", correct: false },
+                                    { text: "Yellow Ducks", target: "portal_duck", correct: false }
+                                ]
+                            },
+                            { 
+                                audio: "Oliver rides his new red bicycle to school every Tuesday. How does Oliver go to school?",
+                                target: "portal_bike",
+                                options: [
+                                    { text: "Yellow Bus", target: "portal_bus", correct: false },
+                                    { text: "Red Bicycle", target: "portal_bike", correct: true },
+                                    { text: "Walking", target: "portal_walk", correct: false }
+                                ]
+                            },
+                            { 
+                                audio: "In the magical forest, the little baby dragon drinks warm honey tea before sleeping. What does the dragon drink?",
+                                target: "portal_tea",
+                                options: [
+                                    { text: "Warm Honey Tea", target: "portal_tea", correct: true },
+                                    { text: "Cold Orange Juice", target: "portal_juice", correct: false },
+                                    { text: "Fresh Water", target: "portal_water", correct: false }
+                                ]
+                            }
+                        ]
+                    }
+                ];
+
+                // 3D Scene Controls & Raycasting for iPad Touch Picking
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.raycaster = new THREE.Raycaster();
+                this.touchVector = new THREE.Vector2();
+
+                this.playerMesh = null;
+                this.fairyMesh = null;
+                this.rabbitMesh = null;
+                this.dragonMesh = null;
+                this.interactiveObjects = [];
+                this.particlesGroup = null;
+
+                // Player Physics State
+                this.playerPos = new THREE.Vector3(0, 0, 0);
+                this.playerVelocity = new THREE.Vector3();
+                this.playerAngle = 0;
+                this.isGrounded = true;
+                this.keys = {};
+                this.touchDirection = { x: 0, y: 0 };
+                this.nearbyTarget = null;
+
+                // Orbit & Free Camera Drag Controls State
+                this.cameraAngleYaw = 0; // Horizontal orbit angle relative to player
+                this.cameraAnglePitch = 0.45; // Vertical pitch angle
+                this.isDraggingCamera = false;
+                this.dragPreviousPos = { x: 0, y: 0 };
+
+                // Audio Context
+                this.audioCtx = null;
+                this.synth = window.speechSynthesis;
+
+                this.initEngine();
+            }
+
+            initEngine() {
+                const container = document.getElementById('canvas-container');
+
+                // Scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x1e1538);
+                this.scene.fog = new THREE.FogExp2(0x1e1538, 0.015);
+
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 8, 14);
+
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                container.appendChild(this.renderer.domElement);
+
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+                this.scene.add(ambientLight);
+
+                const dirLight = new THREE.DirectionalLight(0xfff4cc, 1.2);
+                dirLight.position.set(20, 40, 20);
+                dirLight.castShadow = true;
+                this.scene.add(dirLight);
+
+                // Event Listeners
+                window.addEventListener('resize', () => this.onWindowResize());
+                window.addEventListener('keydown', (e) => this.onKeyDown(e));
+                window.addEventListener('keyup', (e) => this.onKeyUp(e));
+
+                // iPad & Touch Screen Raycaster Event
+                window.addEventListener('pointerdown', (e) => this.onPointerTap(e));
+
+                this.setupCameraDragControls();
+                this.setupTouchControls();
+                this.initAudioContext();
+                this.createPlayerCharacter();
+
+                this.animate();
+            }
+
+            initAudioContext() {
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.audioCtx = new AudioContext();
+                } catch(e) {}
+            }
+
+            /**
+             * Unlocks Audio Context on iPad First Touch Event
+             */
+            unlockAudioOnTouch() {
+                if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                    this.audioCtx.resume();
+                }
+            }
+
+            /**
+             * Direct Touch-to-Interact Raycasting (iPad & Tablets)
+             */
+            onPointerTap(event) {
+                this.unlockAudioOnTouch();
+
+                // Only perform 3D picking if touch is inside the 3D canvas area and not dragging camera
+                if (event.target.tagName !== 'CANVAS' || !this.isGameActive || this.didDragCamera) return;
+
+                this.touchVector.x = (event.clientX / window.innerWidth) * 2 - 1;
+                this.touchVector.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                this.raycaster.setFromCamera(this.touchVector, this.camera);
+                
+                const meshesToTest = [];
+                this.interactiveObjects.forEach(item => {
+                    item.mesh.traverse(child => {
+                        if (child.isMesh) {
+                            child.userDataTarget = item;
+                            meshesToTest.push(child);
+                        }
+                    });
+                });
+
+                const intersects = this.raycaster.intersectObjects(meshesToTest, false);
+                if (intersects.length > 0) {
+                    const clickedProp = intersects[0].object.userDataTarget;
+                    if (clickedProp) {
+                        this.nearbyTarget = clickedProp;
+                        this.onInteractButtonPressed();
+                    }
+                }
+            }
+
+            /**
+             * Mouse Drag & Touch View Rotation Controls
+             */
+            setupCameraDragControls() {
+                const canvas = this.renderer.domElement;
+                let dragDistance = 0;
+
+                const onPointerDown = (e) => {
+                    // Ignore pointer down if clicking UI buttons or joystick zone
+                    if (e.target.closest('#joystick-zone') || e.target.closest('.ui-layer')) return;
+                    this.isDraggingCamera = true;
+                    this.didDragCamera = false;
+                    dragDistance = 0;
+                    this.dragPreviousPos = { x: e.clientX, y: e.clientY };
+                };
+
+                const onPointerMove = (e) => {
+                    if (!this.isDraggingCamera) return;
+
+                    const deltaX = e.clientX - this.dragPreviousPos.x;
+                    const deltaY = e.clientY - this.dragPreviousPos.y;
+
+                    dragDistance += Math.abs(deltaX) + Math.abs(deltaY);
+                    if (dragDistance > 6) {
+                        this.didDragCamera = true; // Prevents triggering target selection if user was orbiting
+                    }
+
+                    // Adjust camera angles
+                    this.cameraAngleYaw -= deltaX * 0.005;
+                    this.cameraAnglePitch += deltaY * 0.005;
+
+                    // Clamp pitch angle so camera doesn't flip underneath or over top
+                    this.cameraAnglePitch = Math.max(0.1, Math.min(Math.PI / 2.2, this.cameraAnglePitch));
+
+                    this.dragPreviousPos = { x: e.clientX, y: e.clientY };
+                };
+
+                const onPointerUp = () => {
+                    this.isDraggingCamera = false;
+                };
+
+                canvas.addEventListener('pointerdown', onPointerDown);
+                window.addEventListener('pointermove', onPointerMove);
+                window.addEventListener('pointerup', onPointerUp);
+            }
+
+            resetCameraAngle() {
+                this.cameraAngleYaw = 0;
+                this.cameraAnglePitch = 0.45;
+            }
+
+            playSynthSound(freq = 440, type = 'sine', duration = 0.2, fadeOut = true) {
+                if (this.audioMuted || !this.audioCtx) return;
+                try {
+                    if (this.audioCtx.state === 'suspended') {
+                        this.audioCtx.resume();
+                    }
+                    const osc = this.audioCtx.createOscillator();
+                    const gain = this.audioCtx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.2, this.audioCtx.currentTime);
+                    if (fadeOut) {
+                        gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + duration);
+                    }
+                    osc.connect(gain);
+                    gain.connect(this.audioCtx.destination);
+                    osc.start();
+                    osc.stop(this.audioCtx.currentTime + duration);
+                } catch(e) {}
+            }
+
+            playChimeEffect() {
+                this.playSynthSound(523.25, 'triangle', 0.15); // C5
+                setTimeout(() => this.playSynthSound(659.25, 'triangle', 0.15), 100); // E5
+                setTimeout(() => this.playSynthSound(783.99, 'triangle', 0.3), 200); // G5
+            }
+
+            playErrorEffect() {
+                this.playSynthSound(220, 'sawtooth', 0.2);
+                setTimeout(() => this.playSynthSound(185, 'sawtooth', 0.25), 150);
+            }
+
+            /**
+             * Builds Low-Poly Stylized Player Explorer Character Mesh
+             */
+            createPlayerCharacter() {
+                this.playerGroup = new THREE.Group();
+
+                // Body (Cute pastel explorer coat)
+                const bodyGeo = new THREE.CylinderGeometry(0.5, 0.6, 1.1, 12);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff6b6b, roughness: 0.4 });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.85;
+                body.castShadow = true;
+                this.playerGroup.add(body);
+
+                // Head (Cute rounded head)
+                const headGeo = new THREE.SphereGeometry(0.55, 16, 16);
+                const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.5 });
+                const head = new THREE.Mesh(headGeo, headMat);
+                head.position.y = 1.7;
+                head.castShadow = true;
+                this.playerGroup.add(head);
+
+                // Explorer Hat
+                const hatBrimGeo = new THREE.CylinderGeometry(0.9, 0.9, 0.05, 16);
+                const hatCrownGeo = new THREE.CylinderGeometry(0.5, 0.55, 0.5, 16);
+                const hatMat = new THREE.MeshStandardMaterial({ color: 0xfeca57, roughness: 0.6 });
+                const hatBrim = new THREE.Mesh(hatBrimGeo, hatMat);
+                hatBrim.position.y = 2.15;
+                const hatCrown = new THREE.Mesh(hatCrownGeo, hatMat);
+                hatCrown.position.y = 2.4;
+                this.playerGroup.add(hatBrim);
+                this.playerGroup.add(hatCrown);
+
+                // Eyes (Big expressive eyes)
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+                const eyeGeo = new THREE.SphereGeometry(0.08, 8, 8);
+                const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+                leftEye.position.set(-0.2, 1.75, 0.48);
+                const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+                rightEye.position.set(0.2, 1.75, 0.48);
+                this.playerGroup.add(leftEye);
+                this.playerGroup.add(rightEye);
+
+                // Backpack
+                const packGeo = new THREE.BoxGeometry(0.6, 0.7, 0.3);
+                const packMat = new THREE.MeshStandardMaterial({ color: 0x48dbfb, roughness: 0.5 });
+                const pack = new THREE.Mesh(packGeo, packMat);
+                pack.position.set(0, 1.1, -0.45);
+                this.playerGroup.add(pack);
+
+                this.playerMesh = this.playerGroup;
+                this.scene.add(this.playerMesh);
+            }
+
+            /**
+             * Construct 3D Environment for Specific Level
+             */
+            buildLevelEnvironment(levelIdx) {
+                // Clear existing level interactive objects
+                this.interactiveObjects.forEach(obj => this.scene.remove(obj.mesh));
+                this.interactiveObjects = [];
+
+                if (this.environmentGroup) this.scene.remove(this.environmentGroup);
+                this.environmentGroup = new THREE.Group();
+
+                // Ambient Floating Particles
+                if (this.particlesGroup) this.scene.remove(this.particlesGroup);
+                this.particlesGroup = new THREE.Group();
+                const pGeo = new THREE.BufferGeometry();
+                const pCount = 150;
+                const pPos = new Float32Array(pCount * 3);
+                for (let i = 0; i < pCount * 3; i += 3) {
+                    pPos[i] = (Math.random() - 0.5) * 60;
+                    pPos[i+1] = Math.random() * 15 + 1;
+                    pPos[i+2] = (Math.random() - 0.5) * 60;
+                }
+                pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+                const pMat = new THREE.PointsMaterial({ size: 0.3, color: 0xffffaa, transparent: true, opacity: 0.8 });
+                this.particlesGroup.add(new THREE.Points(pGeo, pMat));
+                this.scene.add(this.particlesGroup);
+
+                if (levelIdx === 0) {
+                    // LEVEL 1: THE WHISPERING FOREST
+                    this.scene.background = new THREE.Color(0x1a2f23);
+                    this.scene.fog.color = new THREE.Color(0x1a2f23);
+
+                    // Ground Terrain
+                    const groundGeo = new THREE.PlaneGeometry(80, 80, 32, 32);
+                    const groundMat = new THREE.MeshStandardMaterial({ color: 0x2ed573, roughness: 0.8 });
+                    const ground = new THREE.Mesh(groundGeo, groundMat);
+                    ground.rotation.x = -Math.PI / 2;
+                    ground.receiveShadow = true;
+                    this.environmentGroup.add(ground);
+
+                    // Add Trees & Mushrooms
+                    for (let i = 0; i < 35; i++) {
+                        const tx = (Math.random() - 0.5) * 65;
+                        const tz = (Math.random() - 0.5) * 65;
+                        if (Math.hypot(tx, tz) > 6) {
+                            this.addLowPolyTree(tx, tz);
+                        }
+                    }
+
+                    // NPC Rabbit
+                    this.rabbitMesh = this.createRabbitNPC(0, 0, -5);
+                    this.environmentGroup.add(this.rabbitMesh);
+
+                    // Level 1 Interactive Objects Locations
+                    const forestProps = [
+                        { key: "butterfly", name: "Butterfly", color: 0xff9ff3, pos: [-6, 1.2, -4], type: "butterfly" },
+                        { key: "apple_red", name: "Red Apple", color: 0xff4757, pos: [5, 0.5, -6], type: "apple" },
+                        { key: "rabbit_npc", name: "Rabbit", color: 0xffffff, pos: [0, 0.5, -5], type: "rabbit" },
+                        { key: "mushroom_yellow", name: "Yellow Mushroom", color: 0xeccc68, pos: [-8, 0.4, 3], type: "mushroom" },
+                        { key: "flower_blue", name: "Blue Flower", color: 0x1e90ff, pos: [7, 0.4, 4], type: "flower" },
+                        { key: "crystal_forest", name: "Magic Crystal", color: 0x70a1ff, pos: [-4, 0.8, 8], type: "crystal" },
+                        { key: "owl", name: "Owl", color: 0x747d8c, pos: [8, 2.5, -2], type: "owl" },
+                        { key: "tree_pink", name: "Pink Tree", color: 0xffa801, pos: [-10, 0, -10], type: "pink_tree" }
+                    ];
+
+                    forestProps.forEach(p => this.spawnInteractiveProp(p));
+
+                } else if (levelIdx === 1) {
+                    // LEVEL 2: THE FAIRY'S SECRET GARDEN
+                    this.scene.background = new THREE.Color(0x2d132c);
+                    this.scene.fog.color = new THREE.Color(0x2d132c);
+
+                    // Ground Terrain (Pastel Garden)
+                    const groundGeo = new THREE.PlaneGeometry(80, 80);
+                    const groundMat = new THREE.MeshStandardMaterial({ color: 0x7bed9f, roughness: 0.7 });
+                    const ground = new THREE.Mesh(groundGeo, groundMat);
+                    ground.rotation.x = -Math.PI / 2;
+                    ground.receiveShadow = true;
+                    this.environmentGroup.add(ground);
+
+                    // Sparkling River Stream
+                    const riverGeo = new THREE.PlaneGeometry(12, 80);
+                    const riverMat = new THREE.MeshStandardMaterial({ color: 0x70a1ff, roughness: 0.2, metalness: 0.5 });
+                    const river = new THREE.Mesh(riverGeo, riverMat);
+                    river.rotation.x = -Math.PI / 2;
+                    river.position.set(0, 0.05, 0);
+                    this.environmentGroup.add(river);
+
+                    // Rainbow Bridge over River
+                    const bridgeGeo = new THREE.BoxGeometry(8, 0.6, 6);
+                    const bridgeMat = new THREE.MeshStandardMaterial({ color: 0xffa502 });
+                    const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
+                    bridge.position.set(0, 0.3, 0);
+                    this.environmentGroup.add(bridge);
+
+                    // NPC Fairy
+                    this.fairyMesh = this.createFairyNPC(0, 2, -4);
+                    this.environmentGroup.add(this.fairyMesh);
+
+                    // Level 2 Interactive Props
+                    const gardenProps = [
+                        { key: "crystal_bridge", name: "Blue Crystal under bridge", color: 0x1e90ff, pos: [-2, 0.4, 0], type: "crystal" },
+                        { key: "flower_fountain", name: "Red Flower near fountain", color: 0xff4757, pos: [6, 0.4, -6], type: "flower" },
+                        { key: "key_mushroom", name: "Golden Key on mushroom", color: 0xeccc68, pos: [-8, 1.2, -5], type: "key" },
+                        { key: "basket_fairy", name: "Basket beside statue", color: 0x8395a7, pos: [3, 0.5, -4], type: "basket" },
+                        { key: "star_tree", name: "Yellow Star behind tree", color: 0xffd32a, pos: [-10, 0.6, 6], type: "star" },
+                        { key: "potion_gate", name: "Green Potion near gate", color: 0x2ed573, pos: [10, 0.4, 8], type: "potion" },
+                        { key: "bell_leaf", name: "Purple Bell under leaf", color: 0x9c88ff, pos: [-6, 0.4, 10], type: "bell" },
+                        { key: "orb_ring", name: "Orb in stone ring", color: 0xff9ff3, pos: [8, 0.6, -10], type: "orb" }
+                    ];
+
+                    gardenProps.forEach(p => this.spawnInteractiveProp(p));
+
+                } else if (levelIdx === 2) {
+                    // LEVEL 3: THE BABY DRAGON'S CASTLE
+                    this.scene.background = new THREE.Color(0x192a56);
+                    this.scene.fog.color = new THREE.Color(0x192a56);
+
+                    // Castle Floor Tiles
+                    const groundGeo = new THREE.PlaneGeometry(80, 80);
+                    const groundMat = new THREE.MeshStandardMaterial({ color: 0x487eb0, roughness: 0.6 });
+                    const ground = new THREE.Mesh(groundGeo, groundMat);
+                    ground.rotation.x = -Math.PI / 2;
+                    ground.receiveShadow = true;
+                    this.environmentGroup.add(ground);
+
+                    // Castle Pillars & Walls
+                    for (let x of [-15, 15]) {
+                        for (let z = -20; z <= 20; z += 10) {
+                            const pillarGeo = new THREE.CylinderGeometry(1.2, 1.2, 10, 16);
+                            const pillarMat = new THREE.MeshStandardMaterial({ color: 0x2f3640 });
+                            const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+                            pillar.position.set(x, 5, z);
+                            this.environmentGroup.add(pillar);
+                        }
+                    }
+
+                    // NPC Baby Dragon
+                    this.dragonMesh = this.createDragonNPC(0, 0, -8);
+                    this.environmentGroup.add(this.dragonMesh);
+
+                    // Answer Portals will be dynamically set during Level 3 tasks
+                    this.setupLevel3Portals();
+                }
+
+                this.scene.add(this.environmentGroup);
+                // Reset player position
+                this.playerPos.set(0, 0, 8);
+                if (this.playerMesh) this.playerMesh.position.copy(this.playerPos);
+            }
+
+            /**
+             * Procedural Prop Generators
+             */
+            addLowPolyTree(x, z) {
+                const treeGroup = new THREE.Group();
+                const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 2, 8);
+                const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8395a7 });
+                const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+                trunk.position.y = 1;
+                trunk.castShadow = true;
+                treeGroup.add(trunk);
+
+                const leavesGeo = new THREE.ConeGeometry(2, 4, 8);
+                const leavesMat = new THREE.MeshStandardMaterial({ color: 0x1dd1a1, roughness: 0.5 });
+                const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+                leaves.position.y = 3.5;
+                leaves.castShadow = true;
+                treeGroup.add(leaves);
+
+                treeGroup.position.set(x, 0, z);
+                this.environmentGroup.add(treeGroup);
+            }
+
+            createRabbitNPC(x, y, z) {
+                const rabbit = new THREE.Group();
+                const bodyGeo = new THREE.SphereGeometry(0.6, 12, 12);
+                const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf5f6fa });
+                const body = new THREE.Mesh(bodyGeo, whiteMat);
+                body.position.y = 0.6;
+                rabbit.add(body);
+
+                // Ears
+                const earGeo = new THREE.CylinderGeometry(0.1, 0.15, 0.8, 8);
+                const lEar = new THREE.Mesh(earGeo, whiteMat);
+                lEar.position.set(-0.25, 1.4, 0);
+                lEar.rotation.z = -0.2;
+                const rEar = new THREE.Mesh(earGeo, whiteMat);
+                rEar.position.set(0.25, 1.4, 0);
+                rEar.rotation.z = 0.2;
+                rabbit.add(lEar);
+                rabbit.add(rEar);
+
+                rabbit.position.set(x, y, z);
+                return rabbit;
+            }
+
+            createFairyNPC(x, y, z) {
+                const fairy = new THREE.Group();
+                const headGeo = new THREE.SphereGeometry(0.4, 12, 12);
+                const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdd80 });
+                const head = new THREE.Mesh(headGeo, skinMat);
+                head.position.y = 1;
+                fairy.add(head);
+
+                // Wings
+                const wingGeo = new THREE.PlaneGeometry(1.2, 0.8);
+                const wingMat = new THREE.MeshBasicMaterial({ color: 0x74b9ff, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+                const lWing = new THREE.Mesh(wingGeo, wingMat);
+                lWing.position.set(-0.6, 1, -0.2);
+                lWing.rotation.y = 0.3;
+                const rWing = new THREE.Mesh(wingGeo, wingMat);
+                rWing.position.set(0.6, 1, -0.2);
+                rWing.rotation.y = -0.3;
+                fairy.add(lWing);
+                fairy.add(rWing);
+
+                fairy.position.set(x, y, z);
+                return fairy;
+            }
+
+            createDragonNPC(x, y, z) {
+                const dragon = new THREE.Group();
+                const bodyGeo = new THREE.SphereGeometry(1.2, 16, 16);
+                const dragonMat = new THREE.MeshStandardMaterial({ color: 0xff6b6b, roughness: 0.4 });
+                const body = new THREE.Mesh(bodyGeo, dragonMat);
+                body.position.y = 1.2;
+                dragon.add(body);
+
+                // Cute Wings
+                const wingGeo = new THREE.ConeGeometry(0.8, 1.5, 4);
+                const wingMat = new THREE.MeshStandardMaterial({ color: 0xfeca57 });
+                const lWing = new THREE.Mesh(wingGeo, wingMat);
+                lWing.position.set(-1.2, 1.8, -0.2);
+                lWing.rotation.z = 1.2;
+                const rWing = new THREE.Mesh(wingGeo, wingMat);
+                rWing.position.set(1.2, 1.8, -0.2);
+                rWing.rotation.z = -1.2;
+                dragon.add(lWing);
+                dragon.add(rWing);
+
+                dragon.position.set(x, y, z);
+                return dragon;
+            }
+
+            spawnInteractiveProp(propConfig) {
+                const propGroup = new THREE.Group();
+                let geo, mat;
+
+                switch(propConfig.type) {
+                    case "butterfly":
+                        geo = new THREE.BoxGeometry(0.6, 0.1, 0.4);
+                        mat = new THREE.MeshStandardMaterial({ color: propConfig.color, emissive: 0x331133 });
+                        break;
+                    case "apple":
+                        geo = new THREE.SphereGeometry(0.4, 12, 12);
+                        mat = new THREE.MeshStandardMaterial({ color: propConfig.color, roughness: 0.3 });
+                        break;
+                    case "mushroom":
+                        geo = new THREE.CylinderGeometry(0.6, 0.2, 0.6, 8);
+                        mat = new THREE.MeshStandardMaterial({ color: propConfig.color });
+                        break;
+                    case "crystal":
+                        geo = new THREE.OctahedronGeometry(0.6, 0);
+                        mat = new THREE.MeshStandardMaterial({ color: propConfig.color, roughness: 0.1, metalness: 0.8 });
+                        break;
+                    default:
+                        geo = new THREE.SphereGeometry(0.5, 12, 12);
+                        mat = new THREE.MeshStandardMaterial({ color: propConfig.color });
+                }
+
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.castShadow = true;
+                propGroup.add(mesh);
+
+                // Add subtle floating glow ring
+                const ringGeo = new THREE.RingGeometry(0.7, 0.9, 16);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffaa, side: THREE.DoubleSide, transparent: true, opacity: 0.5 });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = -Math.PI / 2;
+                ring.position.y = -0.3;
+                propGroup.add(ring);
+
+                propGroup.position.set(...propConfig.pos);
+                this.environmentGroup.add(propGroup);
+
+                this.interactiveObjects.push({
+                    key: propConfig.key,
+                    name: propConfig.name,
+                    mesh: propGroup,
+                    pos: propGroup.position
+                });
+            }
+
+            setupLevel3Portals() {
+                const currentTask = this.levelsConfig[2].tasks[this.currentTaskIndex];
+                if (!currentTask || !currentTask.options) return;
+
+                // Remove existing portals
+                this.interactiveObjects.forEach(obj => this.environmentGroup.remove(obj.mesh));
+                this.interactiveObjects = [];
+
+                const positions = [[-8, 0, -2], [0, 0, -2], [8, 0, -2]];
+
+                currentTask.options.forEach((opt, idx) => {
+                    const portalGroup = new THREE.Group();
+
+                    // Arch Portal frame
+                    const archGeo = new THREE.TorusGeometry(1.5, 0.2, 16, 32, Math.PI);
+                    const archMat = new THREE.MeshStandardMaterial({ color: opt.correct ? 0x1dd1a1 : 0xff6b6b });
+                    const arch = new THREE.Mesh(archGeo, archMat);
+                    arch.position.y = 1.5;
+                    portalGroup.add(arch);
+
+                    // Inner Energy Shield
+                    const innerGeo = new THREE.CircleGeometry(1.4, 16);
+                    const innerMat = new THREE.MeshBasicMaterial({ color: 0x74b9ff, side: THREE.DoubleSide, transparent: true, opacity: 0.6 });
+                    const inner = new THREE.Mesh(innerGeo, innerMat);
+                    inner.position.y = 1.5;
+                    portalGroup.add(inner);
+
+                    portalGroup.position.set(...positions[idx]);
+                    this.environmentGroup.add(portalGroup);
+
+                    this.interactiveObjects.push({
+                        key: opt.target,
+                        name: opt.text,
+                        correct: opt.correct,
+                        mesh: portalGroup,
+                        pos: portalGroup.position
+                    });
+                });
+            }
+
+            /**
+             * User Control Handlers (Keyboard + Touch Virtual Joystick)
+             */
+            onKeyDown(e) {
+                this.keys[e.code] = true;
+                if (e.code === 'KeyE') this.onInteractButtonPressed();
+                if (e.code === 'KeyR') this.replayAudioInstruction();
+                if (e.code === 'Space') this.triggerPlayerJump();
+            }
+
+            onKeyUp(e) {
+                this.keys[e.code] = false;
+            }
+
+            setupTouchControls() {
+                const zone = document.getElementById('joystick-zone');
+                const knob = document.getElementById('joystick-knob');
+                
+                // Show Touch Joystick on Touch Devices / iPads
+                if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                    zone.style.display = 'flex';
+                }
+
+                let touchId = null;
+                let startX = 0, startY = 0;
+
+                const handleTouchStart = (e) => {
+                    this.unlockAudioOnTouch();
+                    const touch = e.changedTouches[0];
+                    touchId = touch.identifier;
+                    startX = touch.clientX;
+                    startY = touch.clientY;
+                };
+
+                const handleTouchMove = (e) => {
+                    if (touchId === null) return;
+                    for (let touch of e.changedTouches) {
+                        if (touch.identifier === touchId) {
+                            const dx = touch.clientX - startX;
+                            const dy = touch.clientY - startY;
+                            const maxRadius = 45;
+                            const dist = Math.min(Math.hypot(dx, dy), maxRadius);
+                            const angle = Math.atan2(dy, dx);
+                            
+                            const moveX = Math.cos(angle) * dist;
+                            const moveY = Math.sin(angle) * dist;
+
+                            knob.style.transform = `translate(${moveX}px, ${moveY}px)`;
+                            this.touchDirection.x = moveX / maxRadius;
+                            this.touchDirection.y = moveY / maxRadius;
+                        }
+                    }
+                };
+
+                const resetJoystick = () => {
+                    touchId = null;
+                    knob.style.transform = `translate(0px, 0px)`;
+                    this.touchDirection = { x: 0, y: 0 };
+                };
+
+                zone.addEventListener('touchstart', handleTouchStart, { passive: true });
+                zone.addEventListener('touchmove', handleTouchMove, { passive: true });
+                zone.addEventListener('touchend', resetJoystick);
+                zone.addEventListener('touchcancel', resetJoystick);
+            }
+
+            triggerPlayerJump() {
+                if (this.isGrounded) {
+                    this.playerVelocity.y = 0.35;
+                    this.isGrounded = false;
+                    this.playSynthSound(300, 'sine', 0.1);
+                }
+            }
+
+            /**
+             * Game Flow & Adventure State Management
+             */
+            startAdventure(e) {
+                if (e) e.preventDefault();
+                this.unlockAudioOnTouch();
+                
+                const name = document.getElementById('input-student-name').value.trim();
+                const id = document.getElementById('input-student-id').value.trim();
+                const studentClass = document.getElementById('input-student-class').value.trim();
+
+                if (!name || !id || !studentClass) return;
+
+                this.studentProfile.name = name;
+                this.studentProfile.id = id;
+                this.studentProfile.class = studentClass;
+
+                document.getElementById('modal-welcome').classList.add('hidden');
+                document.getElementById('game-header').classList.remove('hidden');
+                document.getElementById('game-footer').classList.remove('hidden');
+
+                this.isGameActive = true;
+                this.loadLevel(0);
+            }
+
+            loadLevel(levelIndex) {
+                this.currentLevelIndex = levelIndex;
+                this.currentTaskIndex = 0;
+                this.currentLevelAttempts = 0;
+                this.currentLevelCorrect = 0;
+                this.currentLevelStartTime = Date.now();
+
+                const lvl = this.levelsConfig[levelIndex];
+                document.getElementById('level-title-display').innerText = lvl.name;
+                document.getElementById('task-progress').innerText = `Task 1 of ${lvl.tasks.length}`;
+
+                this.buildLevelEnvironment(levelIndex);
+                this.playLevelTaskAudio();
+            }
+
+            playLevelTaskAudio() {
+                const lvl = this.levelsConfig[this.currentLevelIndex];
+                const task = lvl.tasks[this.currentTaskIndex];
+                if (!task) return;
+
+                document.getElementById('subtitle-text').innerText = `"${task.audio}"`;
+                document.getElementById('task-progress').innerText = `Task ${this.currentTaskIndex + 1} of ${lvl.tasks.length}`;
+
+                // Speak instruction using SpeechSynthesis
+                this.speak(task.audio);
+
+                if (this.currentLevelIndex === 2) {
+                    this.setupLevel3Portals();
+                }
+            }
+
+            replayAudioInstruction() {
+                const lvl = this.levelsConfig[this.currentLevelIndex];
+                const task = lvl.tasks[this.currentTaskIndex];
+                if (task) {
+                    this.speak(task.audio);
+                }
+            }
+
+            speak(text) {
+                if (this.synth.speaking) this.synth.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.9; // Friendly clear pace for Year 3 pupils
+                utterance.pitch = 1.1;
+                utterance.lang = 'en-US';
+                this.synth.speak(utterance);
+            }
+
+            /**
+             * Collision & Proximity Interaction Checking
+             */
+            checkInteractions() {
+                let closest = null;
+                let minDist = 2.8;
+
+                this.interactiveObjects.forEach(obj => {
+                    const dist = this.playerPos.distanceTo(obj.pos);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closest = obj;
+                    }
+                });
+
+                this.nearbyTarget = closest;
+                const promptEl = document.getElementById('interaction-hud');
+                const promptBtn = document.getElementById('interact-prompt');
+
+                if (closest) {
+                    promptEl.classList.remove('hidden');
+                    promptBtn.innerText = `Select '${closest.name}' ✨`;
+                } else {
+                    promptEl.classList.add('hidden');
+                }
+            }
+
+            onInteractButtonPressed() {
+                if (!this.nearbyTarget || !this.isGameActive) return;
+
+                const currentLvl = this.levelsConfig[this.currentLevelIndex];
+                const currentTask = currentLvl.tasks[this.currentTaskIndex];
+
+                this.currentLevelAttempts++;
+
+                let isCorrect = false;
+                if (this.currentLevelIndex === 2) {
+                    isCorrect = this.nearbyTarget.correct === true;
+                } else {
+                    isCorrect = this.nearbyTarget.key === currentTask.target;
+                }
+
+                if (isCorrect) {
+                    // Correct Response
+                    this.currentLevelCorrect++;
+                    this.scoreGems += 10;
+                    document.getElementById('gem-counter').innerText = `${this.scoreGems} Gems`;
+
+                    this.playChimeEffect();
+                    this.speak("Great job! That is correct!");
+
+                    // Move to Next Task or Complete Level
+                    this.currentTaskIndex++;
+                    if (this.currentTaskIndex >= currentLvl.tasks.length) {
+                        this.onLevelCompleted();
+                    } else {
+                        setTimeout(() => this.playLevelTaskAudio(), 1500);
+                    }
+
+                } else {
+                    // Incorrect Response
+                    this.playErrorEffect();
+                    this.speak("Try again! Listen closely to the instruction.");
+                }
+            }
+
+            /**
+             * Level Completion & Assessment Data Submission
+             */
+            onLevelCompleted() {
+                this.isGameActive = false;
+                const timeTakenSec = Math.round((Date.now() - this.currentLevelStartTime) / 1000);
+                const currentLvl = this.levelsConfig[this.currentLevelIndex];
+                const totalQs = currentLvl.tasks.length;
+                const scorePercent = Math.round((this.currentLevelCorrect / totalQs) * 100);
+
+                const levelResultData = {
+                    studentName: this.studentProfile.name,
+                    studentId: this.studentProfile.id,
+                    studentClass: this.studentProfile.class,
+                    attemptId: this.studentProfile.attemptId,
+                    levelName: currentLvl.name,
+                    skill: currentLvl.skill,
+                    totalQuestions: totalQs,
+                    correct: this.currentLevelCorrect,
+                    incorrect: totalQs - this.currentLevelCorrect,
+                    scorePercentage: scorePercent,
+                    attempts: this.currentLevelAttempts,
+                    timeTaken: timeTakenSec,
+                    status: "Completed",
+                    sheetName: "Level Results"
+                };
+
+                this.levelResults.push(levelResultData);
+
+                // Send to Google Sheets if configured
+                this.sendToGoogleSheets(levelResultData);
+
+                // Show Level Complete UI
+                document.getElementById('complete-level-title').innerText = `${currentLvl.name} Cleared!`;
+                document.getElementById('complete-score').innerText = `${scorePercent}%`;
+                document.getElementById('complete-accuracy').innerText = `${this.currentLevelCorrect} / ${totalQs}`;
+                document.getElementById('complete-time').innerText = `${timeTakenSec}s`;
+                document.getElementById('modal-level-complete').classList.remove('hidden');
+            }
+
+            loadNextLevel() {
+                document.getElementById('modal-level-complete').classList.add('hidden');
+                if (this.currentLevelIndex < this.levelsConfig.length - 1) {
+                    this.isGameActive = true;
+                    this.loadLevel(this.currentLevelIndex + 1);
+                } else {
+                    this.showGrandFinalReport();
+                }
+            }
+
+            showGrandFinalReport() {
+                this.isGameActive = false;
+                document.getElementById('game-header').classList.add('hidden');
+                document.getElementById('game-footer').classList.add('hidden');
+                document.getElementById('modal-final-report').classList.remove('hidden');
+
+                document.getElementById('report-name').innerText = this.studentProfile.name;
+                document.getElementById('report-id').innerText = this.studentProfile.id;
+                document.getElementById('report-class').innerText = this.studentProfile.class;
+
+                const tbody = document.getElementById('report-table-body');
+                tbody.innerHTML = '';
+
+                let totalCorrectSum = 0;
+                let totalQuestionsSum = 0;
+
+                this.levelResults.forEach(res => {
+                    totalCorrectSum += res.correct;
+                    totalQuestionsSum += res.totalQuestions;
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="py-2 font-bold text-yellow-300">${res.levelName}</td>
+                        <td class="py-2 text-xs">${res.skill}</td>
+                        <td class="py-2 text-center font-bold text-emerald-400">${res.correct} / ${res.totalQuestions}</td>
+                        <td class="py-2 text-right font-bold">${res.scorePercentage}%</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                const overallPercent = Math.round((totalCorrectSum / totalQuestionsSum) * 100);
+                document.getElementById('report-overall-percentage').innerText = `${overallPercent}%`;
+
+                // Submit Overall Summary to Google Sheets
+                const overallSummaryPayload = {
+                    studentName: this.studentProfile.name,
+                    studentId: this.studentProfile.id,
+                    studentClass: this.studentProfile.class,
+                    attemptId: this.studentProfile.attemptId,
+                    levelName: "OVERALL KINGDOM SUMMARY",
+                    skill: "All Year 3 Listening Competencies",
+                    totalQuestions: totalQuestionsSum,
+                    correct: totalCorrectSum,
+                    incorrect: totalQuestionsSum - totalCorrectSum,
+                    scorePercentage: overallPercent,
+                    attempts: "-",
+                    timeTaken: "-",
+                    status: "Finished",
+                    sheetName: "Overall Results"
+                };
+                this.sendToGoogleSheets(overallSummaryPayload);
+            }
+
+            /**
+             * Google Sheets Backend API Integration
+             */
+            sendToGoogleSheets(payload) {
+                if (!this.sheetsWebhookUrl) {
+                    console.log("Sheets Webhook URL not configured. Storing locally.", payload);
+                    return;
+                }
+
+                fetch(this.sheetsWebhookUrl, {
+                    method: 'POST',
+                    mode: 'no-cors', // standard for Google Apps Script webhooks
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }).then(() => {
+                    console.log("Successfully posted assessment data to Google Sheets.");
+                    const statusEl = document.getElementById('complete-sheet-status');
+                    if (statusEl) statusEl.innerText = "Synced to Google Sheet ✓";
+                }).catch(err => {
+                    console.error("Error submitting to Google Sheets:", err);
+                });
+            }
+
+            showSheetsConfigModal() {
+                document.getElementById('input-script-url').value = this.sheetsWebhookUrl;
+                document.getElementById('modal-sheets').classList.remove('hidden');
+            }
+
+            closeSheetsConfigModal() {
+                document.getElementById('modal-sheets').classList.add('hidden');
+            }
+
+            saveSheetsConfig() {
+                const url = document.getElementById('input-script-url').value.trim();
+                this.sheetsWebhookUrl = url;
+                localStorage.setItem('kingdom_sheets_url', url);
+                this.closeSheetsConfigModal();
+                alert("Google Sheets Webhook URL saved successfully!");
+            }
+
+            toggleAudioMute() {
+                this.audioMuted = !this.audioMuted;
+                const icon = document.getElementById('audio-icon');
+                if (this.audioMuted) {
+                    icon.className = "fa-solid fa-volume-xmark text-red-400";
+                    if (this.synth.speaking) this.synth.cancel();
+                } else {
+                    icon.className = "fa-solid fa-volume-high text-yellow-300";
+                }
+            }
+
+            /**
+             * 3D Physics Movement & Animation Render Loop
+             */
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                // Player Movement Physics
+                if (this.isGameActive && this.playerMesh) {
+                    let moveX = 0;
+                    let moveZ = 0;
+
+                    if (this.keys['KeyW'] || this.keys['ArrowUp']) moveZ -= 1;
+                    if (this.keys['KeyS'] || this.keys['ArrowDown']) moveZ += 1;
+                    if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveX -= 1;
+                    if (this.keys['KeyD'] || this.keys['ArrowRight']) moveX += 1;
+
+                    // Apply Touch Joystick Input
+                    if (this.touchDirection.x !== 0 || this.touchDirection.y !== 0) {
+                        moveX = this.touchDirection.x;
+                        moveZ = this.touchDirection.y;
+                    }
+
+                    const speed = 0.18;
+                    if (moveX !== 0 || moveZ !== 0) {
+                        // Movement relative to current camera yaw rotation angle
+                        const cosYaw = Math.cos(this.cameraAngleYaw);
+                        const sinYaw = Math.sin(this.cameraAngleYaw);
+
+                        const worldMoveX = moveX * cosYaw - moveZ * sinYaw;
+                        const worldMoveZ = moveX * sinYaw + moveZ * cosYaw;
+
+                        this.playerPos.x += worldMoveX * speed;
+                        this.playerPos.z += worldMoveZ * speed;
+
+                        this.playerAngle = Math.atan2(worldMoveX, worldMoveZ);
+                        this.playerMesh.rotation.y = this.playerAngle;
+
+                        // Wiggle walking animation
+                        this.playerMesh.position.y = (Math.sin(Date.now() * 0.015) * 0.1) + this.playerPos.y;
+                    }
+
+                    // Gravity & Jump Physics
+                    this.playerVelocity.y -= 0.018;
+                    this.playerPos.y += this.playerVelocity.y;
+
+                    if (this.playerPos.y <= 0) {
+                        this.playerPos.y = 0;
+                        this.playerVelocity.y = 0;
+                        this.isGrounded = true;
+                    }
+
+                    // Clamp player boundaries
+                    this.playerPos.x = Math.max(-35, Math.min(35, this.playerPos.x));
+                    this.playerPos.z = Math.max(-35, Math.min(35, this.playerPos.z));
+
+                    this.playerMesh.position.x = this.playerPos.x;
+                    this.playerMesh.position.z = this.playerPos.z;
+
+                    // Calculate Camera Target Position with Orbiting (Yaw & Pitch)
+                    const camDistance = 14;
+                    const targetCamX = this.playerPos.x + camDistance * Math.sin(this.cameraAngleYaw) * Math.cos(this.cameraAnglePitch);
+                    const targetCamY = this.playerPos.y + 1 + camDistance * Math.sin(this.cameraAnglePitch);
+                    const targetCamZ = this.playerPos.z + camDistance * Math.cos(this.cameraAngleYaw) * Math.cos(this.cameraAnglePitch);
+
+                    // Smooth Camera Following
+                    this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, targetCamX, 0.1);
+                    this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, targetCamY, 0.1);
+                    this.camera.position.z = THREE.MathUtils.lerp(this.camera.position.z, targetCamZ, 0.1);
+                    this.camera.lookAt(this.playerPos.x, this.playerPos.y + 1, this.playerPos.z);
+
+                    this.checkInteractions();
+                }
+
+                // Ambient NPC Animations
+                if (this.rabbitMesh) this.rabbitMesh.rotation.y = Math.sin(Date.now() * 0.002) * 0.4;
+                if (this.fairyMesh) {
+                    this.fairyMesh.position.y = 2 + Math.sin(Date.now() * 0.004) * 0.3;
+                    this.fairyMesh.rotation.y += 0.01;
+                }
+                if (this.dragonMesh) {
+                    this.dragonMesh.scale.setScalar(1 + Math.sin(Date.now() * 0.003) * 0.04);
+                }
+
+                // Render Scene
+                if (this.renderer && this.scene && this.camera) {
+                    this.renderer.render(this.scene, this.camera);
+                }
+            }
+
+            onWindowResize() {
+                if (this.camera && this.renderer) {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                }
+            }
+        }
+
+        // Global Initialization on Load
+        window.addEventListener('load', () => {
+            window.game = new EnchantedKingdomGame();
+        });
+    </script>
+</body>
+</html>
